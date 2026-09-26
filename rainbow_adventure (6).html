@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rainbow Adventure</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #bdeeff; font-family: Arial, sans-serif;
+    display: flex; justify-content: center; align-items: center; min-height: 100vh;
+  }
+  #wrap { width: min(900px, 100vw); padding: 10px; }
+  h1 { text-align:center; margin: 4px 0 8px; color:#5b3aa4; }
+  #game {
+    position: relative; overflow: hidden; border: 5px solid white; border-radius: 24px;
+    background: linear-gradient(#8ed8ff 0 62%, #8ee36f 62%);
+    box-shadow: 0 8px 25px #6aa;
+    aspect-ratio: 16/9;
+  }
+  #game.candy {
+    background: linear-gradient(#ffb9e7 0 62%, #ffd66b 62%);
+  }
+  #game.candy #ground {
+    background:#ffcf61; border-top-color:#f39b35;
+  }
+  #game.space {
+    background: radial-gradient(circle at 70% 20%, #4b3b92 0, #151533 35%, #080817 100%);
+  }
+  #game.space #ground {
+    background:#25254a; border-top-color:#55558a;
+  }
+  #game.space .cloud { display:none; }
+  #game.space #player { filter: drop-shadow(0 0 8px white); }
+
+  #game.candy .cloud { filter:hue-rotate(290deg); }
+  #levelBtn {
+    margin-top:8px; display:none;
+  }
+  .coin { position:absolute; font-size:30px; z-index:2; }
+  .worldBtn {
+    min-width:145px; min-height:90px; background:#f4eaff; color:#5b3aa4;
+    box-shadow:0 4px #c6a9e8; padding:12px;
+  }
+  .worldBtn:disabled {
+    opacity:.55; cursor:not-allowed; box-shadow:0 3px #bbb;
+  }
+  #hud {
+    position:absolute; top:10px; left:15px; right:15px; z-index:5;
+    display:flex; justify-content:space-between; font-weight:bold; font-size:20px;
+    color:#4a287c; text-shadow:0 1px white;
+  }
+  #player {
+    position:absolute; width:54px; height:54px; left:80px; bottom:19%;
+    font-size:48px; line-height:54px; z-index:3; user-select:none;
+  }
+  .star { position:absolute; font-size:32px; z-index:2; }
+  .obstacle { position:absolute; font-size:42px; z-index:2; }
+  #ground { position:absolute; bottom:0; width:100%; height:18%; background:#70cf55; border-top:5px solid #4da941; }
+  #message {
+    position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center;
+    align-items:center; background:#ffffffdd; z-index:10; text-align:center;
+  }
+  #message h2 { color:#5b3aa4; font-size:38px; margin:0 0 10px; }
+  button {
+    border:0; border-radius:18px; padding:14px 24px; font-size:20px; font-weight:bold;
+    background:#ffcf45; color:#553900; cursor:pointer; box-shadow:0 4px #d49e18;
+  }
+  #controls { text-align:center; margin-top:10px; color:#4a287c; font-weight:bold; }
+  .cloud { position:absolute; font-size:65px; opacity:.8; }
+  #c1 {left:10%; top:12%} #c2 {right:12%; top:22%}
+
+  body { transition: background .4s ease; }
+  .reduced-motion *, .reduced-motion *::before, .reduced-motion *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  h1 { font-size: clamp(28px, 5vw, 42px); text-shadow: 2px 3px 0 #fff; }
+  #game { transition: transform .2s ease, box-shadow .3s ease; }
+  #game:hover { box-shadow: 0 12px 30px #6aa; }
+  #player { transition: transform .12s ease; }
+  .star, .coin, .obstacle { animation: bob 0.8s ease-in-out infinite alternate; }
+  .coin { filter: drop-shadow(0 0 5px #ffd43b); }
+  .char { min-width:120px; transition: transform .15s, box-shadow .15s; }
+  .char:hover, .worldBtn:hover:not(:disabled), #shopBtn:hover, #homeBtn:hover {
+    transform: translateY(-3px) scale(1.03);
+  }
+  button:active { transform: translateY(2px); }
+  #message { backdrop-filter: blur(4px); }
+  #message h2 { animation: pop .45s ease-out; }
+  .spark {
+    position:absolute; pointer-events:none; z-index:20; font-size:24px;
+    animation: sparkle 900ms ease-out forwards;
+  }
+  @keyframes bob { from { transform: translateY(0) rotate(-3deg); } to { transform: translateY(-7px) rotate(3deg); } }
+  @keyframes pop { 0% { transform:scale(.6); opacity:0; } 100% { transform:scale(1); opacity:1; } }
+  @keyframes sparkle {
+    0% { transform:translate(0,0) scale(.5); opacity:1; }
+    100% { transform:translate(var(--dx),var(--dy)) scale(1.3); opacity:0; }
+  }
+  .badge {
+    display:inline-block; background:#fff2a8; color:#6b4d00; border-radius:999px;
+    padding:6px 12px; margin:4px; box-shadow:0 3px #dfbd55;
+  }
+
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>🌈 Rainbow Adventure ⭐</h1>
+
+  <div id="homeScreen" style="background:white;border-radius:24px;padding:22px;text-align:center;box-shadow:0 5px 20px #9bc;margin-bottom:10px;">
+    <div style="font-size:54px;">🌈⭐🎮</div>
+    <h2 style="margin:5px;color:#5b3aa4;font-size:32px;">Rainbow Adventure</h2>
+    <p style="margin:5px 0 15px;color:#555;">Choose a world and start your adventure!</p>
+    <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+      <button class="worldBtn" id="world1">🌳<br>Rainbow Forest</button>
+      <button class="worldBtn" id="world2" disabled>🍭<br>Candy Land 🔒</button>
+      <button class="worldBtn" id="world3" disabled>🚀<br>Space World 🔒</button>
+    </div>
+    <div style="margin-top:15px;color:#5b3aa4;font-weight:bold;">⭐ Complete worlds to unlock new adventures!</div>
+    <div style="margin-top:15px;font-size:20px;">🪙 Coins: <b id="coinTotal">0</b></div>
+    <div>
+      <span class="badge">⭐ Collect Stars</span>
+      <span class="badge">🪙 Earn Coins</span>
+      <span class="badge">🏆 Unlock Worlds</span>
+    </div>
+    <div style="margin-top:12px;">
+      <button id="shopBtn">🛍️ Character Shop</button>
+      <button id="soundBtn">🔊 Sound On</button>
+      <button id="settingsBtn">⚙️ Settings</button>
+    </div>
+    <div id="settingsPanel" style="display:none;margin-top:12px;background:#eef8ff;border-radius:16px;padding:14px;text-align:left;">
+      <b style="color:#5b3aa4;font-size:20px;">⚙️ Settings</b>
+      <div style="margin-top:10px;">
+        <label style="display:block;margin:8px 0;">
+          <input type="checkbox" id="musicToggle" checked> 🎵 Background music
+        </label>
+        <label style="display:block;margin:8px 0;">
+          <input type="checkbox" id="soundToggle" checked> 🔊 Game sounds
+        </label>
+        <label style="display:block;margin:8px 0;">
+          <input type="checkbox" id="motionToggle"> ✨ Reduced motion
+        </label>
+      </div>
+    </div>
+    <div id="shop" style="display:none;margin-top:12px;background:#f7f0ff;border-radius:16px;padding:12px;">
+      <b style="color:#5b3aa4;">Character Shop</b>
+      <div id="shopItems" style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:8px;"></div>
+    </div>
+  </div>
+  <div id="characters" style="background:white;border-radius:20px;padding:12px;margin-bottom:10px;text-align:center;box-shadow:0 4px 15px #9bc;">
+    <strong style="font-size:20px;color:#5b3aa4;">Choose your character:</strong>
+    <div style="display:flex;justify-content:center;gap:10px;margin-top:10px;flex-wrap:wrap;">
+      <button class="char" data-char="🐰">🐰 Bunny</button>
+      <button class="char" data-char="🐱">🐱 Kitty</button>
+      <button class="char" data-char="🐶">🐶 Puppy</button>
+      <button class="char" data-char="🦊">🦊 Fox</button>
+    </div>
+    <div id="chosen" style="margin-top:7px;color:#5b3aa4;font-weight:bold;">Selected: 🐰 Bunny</div>
+  </div>
+  <div id="game">
+    <div id="hud"><span>⭐ Stars: <b id="score">0</b> &nbsp; 🪙 <b id="runCoins">0</b></span><span>🏆 <b id="levelName">Level 1</b></span></div>
+    <div id="c1" class="cloud">☁️</div><div id="c2" class="cloud">☁️</div>
+    <div id="ground"></div>
+    <div id="player">🐰</div>
+    <div id="message">
+      <h2>Rainbow Adventure!</h2>
+      <p>Use ⬆️ or tap the screen to jump.<br>Collect ⭐ and avoid 🪨!</p>
+      <button id="start">Start Game</button>
+    </div>
+  </div>
+  <div id="controls">Keyboard: ↑ / Space &nbsp; • &nbsp; Phone: tap to jump</div>
+  <div style="text-align:center;margin-top:8px;">
+    <button id="homeBtn">🏠 Home</button>
+  </div>
+  <div style="text-align:center;">
+    <button id="levelBtn">🍭 Play Candy Land</button>
+    <button id="spaceBtn" style="display:none;">🚀 Play Space World</button>
+  </div>
+</div>
+<script>
+const game = document.getElementById('game');
+const player = document.getElementById('player');
+const scoreEl = document.getElementById('score');
+const message = document.getElementById('message');
+const startBtn = document.getElementById('start');
+const levelBtn = document.getElementById('levelBtn');
+const spaceBtn = document.getElementById('spaceBtn');
+const levelName = document.getElementById('levelName');
+const homeScreen = document.getElementById('homeScreen');
+const homeBtn = document.getElementById('homeBtn');
+const world1 = document.getElementById('world1');
+const world2 = document.getElementById('world2');
+const world3 = document.getElementById('world3');
+const coinTotalEl = document.getElementById('coinTotal');
+const runCoinsEl = document.getElementById('runCoins');
+const shopBtn = document.getElementById('shopBtn');
+const shop = document.getElementById('shop');
+const shopItems = document.getElementById('shopItems');
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsPanel = document.getElementById('settingsPanel');
+const musicToggle = document.getElementById('musicToggle');
+const soundToggle = document.getElementById('soundToggle');
+const motionToggle = document.getElementById('motionToggle');
+const chosen = document.getElementById('chosen');
+let selectedChar = '🐰';
+document.querySelectorAll('.char').forEach(btn => {
+  btn.onclick = () => {
+    selectedChar = btn.dataset.char;
+    chosen.textContent = 'Selected: ' + btn.textContent;
+    player.textContent = selectedChar;
+  };
+});
+
+let running=false, score=0, jumping=false, vy=0, items=[], last=0, spawn=0;
+let level=1;
+let level2Unlocked=false;
+let level3Unlocked=false;
+let rocketUntil=0;
+let totalCoins=0;
+let runCoins=0;
+const characters = [
+  {emoji:'🐰', name:'Bunny', cost:0},
+  {emoji:'🐱', name:'Kitty', cost:0},
+  {emoji:'🐶', name:'Puppy', cost:10},
+  {emoji:'🦊', name:'Fox', cost:20},
+  {emoji:'🐼', name:'Panda', cost:30},
+  {emoji:'🐯', name:'Tiger', cost:40}
+];
+let unlockedChars = new Set(['🐰','🐱']);
+let soundOn = true;
+let musicOn = true;
+let reducedMotion = false;
+let audioCtx = null;
+let musicTimer = null;
+
+function beep(freq, duration=0.08, type='sine', volume=0.055){
+  if (!soundOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(volume, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + duration);
+  } catch(e) {}
+}
+function playJump(){ beep(520,.08,'triangle'); beep(700,.07,'triangle',.035); }
+function playCoin(){ beep(880,.07,'square'); setTimeout(()=>beep(1175,.08,'square',.04),55); }
+function playStar(){ beep(660,.08,'sine'); setTimeout(()=>beep(990,.1,'sine',.04),70); }
+function playCrash(){ beep(130,.22,'sawtooth',.07); beep(80,.2,'sawtooth',.04); }
+function playWin(){ [660,880,1047].forEach((f,i)=>setTimeout(()=>beep(f,.15,'triangle',.05),i*120)); }
+function startMusic(){
+  if (!soundOn || !musicOn || musicTimer) return;
+  const notes=[262,330,392,523,392,330];
+  let i=0;
+  musicTimer=setInterval(()=>{ if(soundOn) beep(notes[i++%notes.length],.16,'sine',.018); },360);
+}
+function stopMusic(){ if(musicTimer){ clearInterval(musicTimer); musicTimer=null; } }
+
+
+try {
+  totalCoins = Number(localStorage.getItem('rainbowCoins') || 0);
+  const saved = JSON.parse(localStorage.getItem('rainbowCharacters') || '[]');
+  saved.forEach(x => unlockedChars.add(x));
+} catch(e) {}
+function saveProgress(){
+  try {
+    localStorage.setItem('rainbowCoins', String(totalCoins));
+    localStorage.setItem('rainbowCharacters', JSON.stringify([...unlockedChars]));
+  } catch(e) {}
+}
+function renderShop(){
+  coinTotalEl.textContent = totalCoins;
+  shopItems.innerHTML = '';
+  characters.forEach(c => {
+    const b = document.createElement('button');
+    const owned = unlockedChars.has(c.emoji);
+    b.innerHTML = owned ? `${c.emoji}<br>${c.name} ✓` : `${c.emoji}<br>${c.name}<br>🪙 ${c.cost}`;
+    b.disabled = owned;
+    b.onclick = () => {
+      if (!unlockedChars.has(c.emoji) && totalCoins >= c.cost) {
+        totalCoins -= c.cost;
+        unlockedChars.add(c.emoji);
+        coinTotalEl.textContent = totalCoins;
+        saveProgress();
+        renderShop();
+      }
+    };
+    shopItems.appendChild(b);
+  });
+}
+shopBtn.onclick = () => {
+  shop.style.display = shop.style.display === 'none' ? 'block' : 'none';
+  renderShop();
+};
+soundBtn.onclick = () => {
+  soundOn = !soundOn;
+  soundBtn.textContent = soundOn ? '🔊 Sound On' : '🔇 Sound Off';
+  soundToggle.checked = soundOn;
+  if (soundOn && musicOn) startMusic(); else stopMusic();
+};
+settingsBtn.onclick = () => {
+  settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+};
+musicToggle.onchange = () => {
+  musicOn = musicToggle.checked;
+  if (musicOn && soundOn && running) startMusic(); else stopMusic();
+};
+soundToggle.onchange = () => {
+  soundOn = soundToggle.checked;
+  soundBtn.textContent = soundOn ? '🔊 Sound On' : '🔇 Sound Off';
+  if (!soundOn) stopMusic();
+  else if (musicOn && running) startMusic();
+};
+motionToggle.onchange = () => {
+  reducedMotion = motionToggle.checked;
+  document.body.classList.toggle('reduced-motion', reducedMotion);
+};
+function updateMap(){
+  world2.disabled = !level2Unlocked;
+  world2.innerHTML = level2Unlocked ? '🍭<br>Candy Land' : '🍭<br>Candy Land 🔒';
+  world3.disabled = !level3Unlocked;
+  world3.innerHTML = level3Unlocked ? '🚀<br>Space World' : '🚀<br>Space World 🔒';
+}
+function showHome(){
+  running = false;
+  stopMusic();
+  message.style.display='none';
+  homeScreen.style.display='block';
+  document.getElementById('characters').style.display='block';
+  document.getElementById('game').style.display='none';
+  updateMap();
+}
+function launchLevel(n){
+  settingsPanel.style.display='none';
+  homeScreen.style.display='none';
+  document.getElementById('characters').style.display='block';
+  document.getElementById('game').style.display='block';
+  reset(n);
+}
+world1.onclick=()=>launchLevel(1);
+world2.onclick=()=>launchLevel(2);
+world3.onclick=()=>launchLevel(3);
+homeBtn.onclick=showHome;
+updateMap();
+renderShop();
+
+function sparkleAt(x, y, emoji='✨'){
+  const s=document.createElement('div');
+  s.className='spark';
+  s.textContent=emoji;
+  s.style.left=x+'px';
+  s.style.top=y+'px';
+  s.style.setProperty('--dx', ((Math.random()*100)-50)+'px');
+  s.style.setProperty('--dy', (-40-Math.random()*70)+'px');
+  game.appendChild(s);
+  setTimeout(()=>s.remove(),900);
+}
+function jump(){
+  if (!running) return;
+  if (!jumping) {
+    jumping=true; vy=850;
+    playJump();
+    player.style.transform='scale(1.12) rotate(-4deg)';
+    setTimeout(()=>player.style.transform='',140);
+  }
+}
+document.addEventListener('keydown', e => {
+  if (e.code==='ArrowUp' || e.code==='Space') { e.preventDefault(); jump(); }
+});
+game.addEventListener('pointerdown', e => { if (running) jump(); });
+
+function makeItem(type){
+  const el=document.createElement('div');
+  el.className=type;
+  if (type === 'coin') {
+    el.textContent = '🪙';
+  } else if (level === 3) {
+    el.textContent = type === 'star' ? '💎' : (type === 'power' ? '🚀' : '☄️');
+  } else if (level === 2) {
+    el.textContent = type === 'star' ? '🍬' : '🧁';
+  } else {
+    el.textContent = type === 'star' ? '⭐' : '🪨';
+  }
+  el.style.left=game.clientWidth+30+'px';
+  el.style.bottom=(type==='star' ? (25+Math.random()*35) : 18)+'%';
+  game.appendChild(el);
+  items.push({el, x:game.clientWidth+30, type});
+}
+function reset(selectedLevel=1){
+  level = selectedLevel;
+  player.textContent = selectedChar;
+  game.classList.remove('candy','space');
+  if (level === 2) game.classList.add('candy');
+  if (level === 3) game.classList.add('space');
+  levelName.textContent = level === 3 ? 'Space World' : (level === 2 ? 'Candy Land' : 'Level 1');
+  rocketUntil = 0;
+  items.forEach(i=>i.el.remove()); items=[];
+  score=0; scoreEl.textContent=0; runCoins=0; runCoinsEl.textContent=0; jumping=false; vy=0;
+  player.style.bottom='19%';
+  spawn=0; last=performance.now(); running=true; message.style.display='none';
+  if (soundOn) { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch(e) {} startMusic(); }
+  requestAnimationFrame(loop);
+}
+function end(){
+  running=false;
+  stopMusic();
+  playCrash();
+  message.style.display='flex';
+  message.querySelector('h2').textContent = level === 3 ? 'Space Crash! ☄️' : (level === 2 ? 'Candy Land Challenge! 🍭' : 'Oops! Try Again! 💪');
+  message.querySelector('p').innerHTML =
+    level === 2
+      ? `You collected <b>${score}</b> candies!<br>Space World can be our next adventure! 🚀`
+      : `You collected <b>${score}</b> stars!<br>Watch out for the rocks and try again.`;
+  startBtn.textContent='Play Again';
+}
+function loop(t){
+  if(!running) return;
+  const dt=Math.min((t-last)/1000,.03); last=t;
+  // gravity
+  let bottom=parseFloat(getComputedStyle(player).bottom);
+  if (level === 3 && performance.now() < rocketUntil) {
+    jumping = true;
+    vy = Math.max(vy, 0);
+    bottom = 48 + Math.sin(performance.now()/180)*8;
+    player.style.bottom = bottom + '%';
+  }
+  if(jumping && !(level === 3 && performance.now() < rocketUntil)){
+    vy-=1900*dt; bottom += vy*dt/10;
+    if(bottom<=19){bottom=19;jumping=false;vy=0;}
+    player.style.bottom=bottom+'%';
+  }
+  if (level === 3 && rocketUntil && performance.now() >= rocketUntil) {
+    player.textContent = selectedChar;
+    rocketUntil = 0;
+  }
+  spawn-=dt;
+  if(spawn<=0){
+    if (Math.random() < .22) {
+      makeItem('coin');
+    } else if (level === 3 && Math.random() < .16) {
+      makeItem('power');
+    } else {
+      makeItem(Math.random()<.65?'star':'obstacle');
+    }
+    spawn=(level === 3 ? .55 : .65)+Math.random()*.65;
+  }
+  const pr=player.getBoundingClientRect();
+  for(let i=items.length-1;i>=0;i--){
+    const it=items[i]; it.x-=(level === 3 ? 450 : (level === 2 ? 390 : 300))*dt; it.el.style.left=it.x+'px';
+    const r=it.el.getBoundingClientRect();
+    if(r.right<0){it.el.remove();items.splice(i,1);continue;}
+    if(pr.left<r.right-8 && pr.right>r.left+8 && pr.top<r.bottom-5 && pr.bottom>r.top+5){
+      if(it.type==='coin'){
+        sparkleAt(it.x, parseFloat(it.el.style.bottom) || 30, '🪙');
+        runCoins++;
+        playCoin();
+        runCoinsEl.textContent=runCoins;
+        totalCoins++;
+        coinTotalEl.textContent=totalCoins;
+        saveProgress();
+        it.el.remove(); items.splice(i,1);
+        continue;
+      }
+      if(it.type==='power'){
+        rocketUntil = performance.now() + 5000;
+        it.el.remove(); items.splice(i,1);
+        player.textContent = '🚀';
+        continue;
+      }
+      if(it.type==='star'){
+        sparkleAt(it.x, parseFloat(it.el.style.bottom) || 30, level === 3 ? '💎' : '⭐');
+        score++; playStar(); scoreEl.textContent=score; it.el.remove(); items.splice(i,1);
+        if (level === 1 && score >= 10) {
+          level2Unlocked = true;
+          updateMap();
+          running = false;
+          message.style.display = 'flex';
+          stopMusic(); playWin();
+          message.querySelector('h2').textContent = 'Level 1 Complete! 🎉';
+          message.querySelector('p').innerHTML = 'You collected 10 stars!<br>Candy Land is unlocked! 🍭';
+          startBtn.textContent = 'Play Level 1 Again';
+          levelBtn.style.display = 'inline-block';
+          return;
+        }
+        if (level === 2 && score >= 10) {
+          level3Unlocked = true;
+          updateMap();
+          running = false;
+          message.style.display = 'flex';
+          stopMusic(); playWin();
+          message.querySelector('h2').textContent = 'Candy Land Complete! 🍭🎉';
+          message.querySelector('p').innerHTML = 'Amazing! You collected 10 candies.<br>🚀 Space World is unlocked!';
+          startBtn.textContent = 'Play Candy Land Again';
+          levelBtn.style.display = 'none';
+          spaceBtn.style.display = 'inline-block';
+          return;
+        }
+        if (level === 3 && score >= 10) {
+          running = false;
+          message.style.display = 'flex';
+          stopMusic(); playWin();
+          message.querySelector('h2').textContent = 'Space World Complete! 🚀🎉';
+          message.querySelector('p').innerHTML = 'You collected 10 space crystals!<br>🌟 You are a Rainbow Adventure champion!';
+          startBtn.textContent = 'Play Space World Again';
+          return;
+        }
+      } else { end(); return; }
+    }
+  }
+  requestAnimationFrame(loop);
+}
+document.getElementById('game').style.display='none';
+startBtn.onclick=() => reset(level);
+levelBtn.onclick = () => {
+  levelBtn.style.display='none';
+  reset(2);
+};
+spaceBtn.onclick = () => {
+  spaceBtn.style.display='none';
+  reset(3);
+};
+</script>
+</body>
+</html>
