@@ -1,0 +1,40 @@
+name: Build Rainbow Adventure
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get project
+        uses: actions/checkout@v4
+
+      - name: Unpack Android project
+        run: |
+          unzip -o RainbowAdventureAndroid.zip -d android_project
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gworking-directory: android_project/RainbowAdventureAndroid
+
+      - name: Build Android App Bundle
+        working-directory: android_project
+        run: gradle bundleRelease
+
+      - name: Save Android App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: RainbowAdventure-AAB
+          path: android_project/app/build/outputs/bundle/release/app-release.aab
